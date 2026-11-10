@@ -1,15 +1,15 @@
 /**
- * Catégories autorisées pour les signalements d'infrastructure et de services.
+ * Catégories autorisées pour les signalements d'infrastructure et de services publics.
  */
 export type ReportCategory = "eau" | "electricite" | "route" | "sante";
 
 /**
- * Statuts possibles pour le suivi d'un signalement.
+ * Statuts de modération et de cycle de vie d'un signalement.
  */
 export type ReportStatus = "en_attente" | "valide" | "resolu";
 
 /**
- * Interface représentant un signalement dans la base de données.
+ * Interface représentant un signalement stocké dans la table reports.
  */
 export interface Report {
   id: string;
@@ -20,11 +20,37 @@ export interface Report {
   longitude: number;
   status: ReportStatus;
   created_at: string;
+  updated_at?: string;
+  user_id?: string | null;
+  location?: unknown;
 }
 
 /**
- * Type pour la création d'un nouveau signalement (champs générés exclus).
+ * Signalement enrichi avec la distance calculée en mètres (pour la recherche spatiale).
  */
-export type CreateReportInput = Omit<Report, "id" | "status" | "created_at"> & {
+export interface ReportWithDistance extends Report {
+  distance_meters: number;
+}
+
+/**
+ * Données requises pour la création d'un signalement.
+ */
+export type CreateReportInput = {
+  title: string;
+  description: string;
+  category: ReportCategory;
+  latitude: number;
+  longitude: number;
+};
+
+/**
+ * Données autorisées pour la modération ou mise à jour d'un signalement.
+ */
+export type UpdateReportInput = {
+  title?: string;
+  description?: string;
+  category?: ReportCategory;
+  latitude?: number;
+  longitude?: number;
   status?: ReportStatus;
 };
