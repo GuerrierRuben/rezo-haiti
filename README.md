@@ -90,15 +90,31 @@ NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-cle-anon-publique
 ```
 
-### 5. Exécuter la migration SQL initiale
-Dans l'interface Supabase de votre projet, rendez-vous dans le **SQL Editor** et exécutez le contenu du fichier :
-[`supabase/migrations/001_init_reports.sql`](supabase/migrations/001_init_reports.sql)
+### 5. Exécuter les migrations SQL dans Supabase
+Dans l'interface Supabase de votre projet, rendez-vous dans le **SQL Editor** et exécutez dans l'ordre :
+1. [`supabase/migrations/001_init_reports.sql`](supabase/migrations/001_init_reports.sql) : extension PostGIS et table `reports`.
+2. [`supabase/migrations/002_profiles_rls_geo.sql`](supabase/migrations/002_profiles_rls_geo.sql) : profils, RLS, colonne géométrique et recherche de proximité `nearby_reports`.
 
 ### 6. Lancer le serveur de développement
 ```bash
 npm run dev
 ```
 Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
+
+---
+
+## 📡 Documentation des API REST
+
+L'ensemble des endpoints REST pour les signalements et la gestion des utilisateurs est documenté dans le fichier dédié :
+👉 [**Consulter la documentation complète de l'API (docs/API.md)**](docs/API.md)
+
+### Tests rapides des API
+- Via fichier HTTP : ouvrez [`api-tests.http`](api-tests.http) avec l'extension REST Client dans VS Code.
+- Via script Bash :
+```bash
+chmod +x scripts/test-api.sh
+./scripts/test-api.sh
+```
 
 ---
 
@@ -113,13 +129,13 @@ Ouvrez [http://localhost:3000](http://localhost:3000) dans votre navigateur.
 
 ## 🗺️ Feuille de Route (Roadmap en 5 Sprints)
 
-| Sprint | Objectif | Livrables clés |
-| :--- | :--- | :--- |
-| **Sprint 1 (Actuel)** | **Fondations & Architecture** | Initialisation Next.js + Tailwind + TypeScript, schéma SQL PostgreSQL/PostGIS, client Supabase, configuration Git et CI. |
-| **Sprint 2** | **Signalement Citoyen** | Formulaire mobile de signalement avec géolocalisation GPS, validation des entrées et insertion dans Supabase. |
-| **Sprint 3** | **Cartographie Interactive** | Intégration de la carte (MapLibre / Leaflet), affichage des signalements par catégorie et clustering géographique PostGIS. |
-| **Sprint 4** | **Modération & Statuts** | Interface d'administration pour la validation communautaire, historique des changements de statut (en attente, validé, résolu). |
-| **Sprint 5** | **Offline-First & Notifications** | PWA (Progressive Web App) avec support hors-ligne, mise en cache locale et flux d'alertes citoyennes. |
+| Sprint | Objectif | Statut | Livrables clés |
+| :--- | :--- | :--- | :--- |
+| **Sprint 1** | **Fondations & Architecture** | ✅ Terminé | Initialisation Next.js + Tailwind + TypeScript, schéma SQL PostgreSQL/PostGIS, client Supabase, configuration Git et CI. |
+| **Sprint 2** | **API CRUD, Sécurité RLS & PostGIS** | ✅ Terminé | Routes API `/api/reports`, `/api/reports/nearby`, `/api/users/me`, `/api/users`, validation Zod stricte (boîte Haïti), politiques RLS fines, documentation et tests. |
+| **Sprint 3** | **Cartographie Interactive & UI** | ⏳ À venir | Intégration de la carte (MapLibre / Leaflet), affichage des signalements par catégorie et clustering géographique PostGIS. |
+| **Sprint 4** | **Modération & Communauté** | ⏳ À venir | Interface d'administration pour la validation communautaire, historique des changements de statut (en attente, validé, résolu). |
+| **Sprint 5** | **Offline-First & Notifications** | ⏳ À venir | PWA (Progressive Web App) avec support hors-ligne, mise en cache locale et flux d'alertes citoyennes. |
 
 ---
 

@@ -1,0 +1,76 @@
+### Configuration des variables
+@baseUrl = http://localhost:3000/api
+@tokenCitoyen = VOTRE_TOKEN_CITOYEN
+@tokenModerateur = VOTRE_TOKEN_MODERATEUR
+@tokenAdmin = VOTRE_TOKEN_ADMIN
+
+### 1. GET /api/reports - Liste publique paginée
+GET {{baseUrl}}/reports?page=1&limit=10
+
+### 2. GET /api/reports - Filtre par catégorie et recherche textuelle
+GET {{baseUrl}}/reports?category=eau&q=potable
+
+### 3. GET /api/reports - Filtre par bounding box
+GET {{baseUrl}}/reports?bbox=-72.5,18.4,-72.2,18.7
+
+### 4. POST /api/reports - Création anonyme de signalement
+POST {{baseUrl}}/reports
+Content-Type: application/json
+
+{
+  "title": "Panne de transformateur électrique",
+  "description": "Le transformateur du secteur Delmas 33 a explosé hier soir suite aux intempéries.",
+  "category": "electricite",
+  "latitude": 18.5520,
+  "longitude": -72.2980
+}
+
+### 5. POST /api/reports - Création avec coordonnées invalides (hors Haïti -> 422 attendu)
+POST {{baseUrl}}/reports
+Content-Type: application/json
+
+{
+  "title": "Signalement à Paris",
+  "description": "Ce signalement ne doit pas être accepté car hors Haïti.",
+  "category": "route",
+  "latitude": 48.8566,
+  "longitude": 2.3522
+}
+
+### 6. GET /api/reports/:id - Consultation d'un signalement
+# Remplacer par un UUID valide existant
+@reportId = 00000000-0000-0000-0000-000000000000
+GET {{baseUrl}}/reports/{{reportId}}
+
+### 7. PATCH /api/reports/:id - Modération (statut validé) - Nécessite rôle moderateur/admin
+PATCH {{baseUrl}}/reports/{{reportId}}
+Authorization: Bearer {{tokenModerateur}}
+Content-Type: application/json
+
+{
+  "status": "valide"
+}
+
+### 8. DELETE /api/reports/:id - Suppression - Nécessite rôle moderateur/admin
+DELETE {{baseUrl}}/reports/{{reportId}}
+Authorization: Bearer {{tokenModerateur}}
+
+### 9. GET /api/reports/nearby - Recherche spatiale PostGIS (rayon 15 km)
+GET {{baseUrl}}/reports/nearby?lat=18.5392&lng=-72.3350&radius=15000
+
+### 10. GET /api/users/me - Mon profil connecté
+GET {{baseUrl}}/users/me
+Authorization: Bearer {{tokenCitoyen}}
+
+### 11. PATCH /api/users/me - Mise à jour de mon nom d'affichage
+PATCH {{baseUrl}}/users/me
+Authorization: Bearer {{tokenCitoyen}}
+Content-Type: application/json
+
+{
+  "display_name": "Jean Jacques"
+}
+
+### 12. GET /api/users - Liste des utilisateurs - Réservé Admin (403 si citoyen)
+GET {{baseUrl}}/users?page=1&limit=20
+Authorization: Bearer {{tokenAdmin}}
