@@ -117,7 +117,11 @@ export async function POST(req: NextRequest) {
     const { user } = await getAuthUser(req);
     const supabase = createServerSupabaseClient(req);
 
+    const reportId = crypto.randomUUID();
+    const now = new Date().toISOString();
+
     const reportData = {
+      id: reportId,
       title: parsedBody.data.title,
       description: parsedBody.data.description,
       category: parsedBody.data.category,
@@ -127,13 +131,27 @@ export async function POST(req: NextRequest) {
       user_id: user ? user.id : null,
     };
 
-    const { data, error } = await supabase
-      .from("reports")
-      .insert(reportData)
-      .select(
-        "id, title, description, category, latitude, longitude, status, created_at, updated_at, user_id"
-      )
-      .single();
+    if (user) {
+      const { data, error } = await supabase
+        .from("reports")
+        .insert(reportData)
+        .select(
+          "id, title, description, category, latitude, longitude, status, created_at, updated_at, user_id"
+        )
+        .single();
+
+      if (error) {
+        return jsonError(
+          "INSERTION_FAILED",
+          "Impossible d'enregistrer le signalement.",
+          500
+        );
+      }
+
+      return jsonOk(data, 201);
+    }
+
+    const { error } = await supabase.from("reports").insert(reportData);
 
     if (error) {
       return jsonError(
@@ -143,7 +161,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return jsonOk(data, 201);
+    return jsonOk(
+      {
+        ...reportData,
+        created_at: now,
+        updated_at: now,
+      },
+      201
+    );
   } catch {
     return jsonError(
       "INTERNAL_SERVER_ERROR",
