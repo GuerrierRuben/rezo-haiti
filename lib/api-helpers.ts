@@ -5,8 +5,9 @@ import type {
   ApiErrorResponse,
   ApiSuccessResponse,
   PaginationMeta,
-} from "@/types/api";
-import type { Profile, UserRole } from "@/types/profile";
+  Profile,
+  UserRole,
+} from "@/types";
 
 /**
  * Retourne une réponse JSON standardisée de succès.

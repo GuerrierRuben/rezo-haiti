@@ -2,7 +2,7 @@ import { NextRequest } from "next/server";
 import { jsonError, jsonOk } from "@/lib/api-helpers";
 import { createServerSupabaseClient } from "@/lib/supabase-server";
 import { nearbyQuerySchema } from "@/lib/validations";
-import type { ReportWithDistance } from "@/types/report";
+import type { ReportWithDistance } from "@/types";
 
 /**
  * GET /api/reports/nearby
