@@ -133,13 +133,35 @@ export default function HomePage() {
     setIsLoading(false);
   }, []);
 
-  // Chargement initial des signalements côté client
+  // Chargement initial des signalements avec protection contre les effets fantômes du Strict Mode
   useEffect(() => {
-    loadReports();
-  }, [loadReports]);
+    let isMounted = true;
+
+    const fetchInitialReports = async () => {
+      setIsLoading(true);
+      setFetchError(null);
+
+      const { data, error } = await getReports({ limit: 50 });
+      if (!isMounted) return;
+
+      if (error) {
+        setFetchError(error);
+      } else {
+        setReports(data ?? []);
+      }
+
+      setIsLoading(false);
+    };
+
+    fetchInitialReports();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   /**
-   * Envoie un signalement test via reportService et recharge la liste.
+   * Envoie un signalement test via reportService et recharge la liste partagée.
    */
   const handleSendTestReport = async () => {
     setIsSubmitting(true);
@@ -152,13 +174,42 @@ export default function HomePage() {
         type: "error",
         message: error,
       });
-    } else if (data) {
-      setFeedback({
-        type: "success",
-        message: `Signalement envoyé avec succès ! Statut : "${data.status}" (ID : ${data.id.slice(0, 8)}...).`,
-      });
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (data) {
       // Rechargement des signalements après l'insertion réussie
-      await loadReports();
+      const { data: updatedReports, error: fetchErr } = await getReports({
+        limit: 50,
+      });
+
+      if (fetchErr) {
+        setFeedback({
+          type: "success",
+          message: `Signalement envoyé avec succès ! (ID : ${data.id.slice(0, 8)}...).`,
+        });
+        setFetchError(fetchErr);
+      } else {
+        const newList = updatedReports ?? [];
+        setReports(newList);
+
+        // Vérifie si le signalement nouvellement créé apparaît dans les résultats publics
+        const isVisible = newList.some((r) => r.id === data.id);
+
+        if (isVisible) {
+          setFeedback({
+            type: "success",
+            message: `Signalement envoyé avec succès et affiché sur la carte ! (ID : ${data.id.slice(0, 8)}...)`,
+          });
+        } else {
+          // En vertu des règles de sécurité (RLS), les signalements 'en_attente' ne sont pas visibles publiquement
+          setFeedback({
+            type: "success",
+            message: `Signalement envoyé avec succès (statut : « En attente »). En vertu des règles de sécurité (RLS), il apparaîtra publiquement sur la carte dès sa validation par un modérateur.`,
+          });
+        }
+      }
     }
 
     setIsSubmitting(false);
@@ -230,7 +281,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Section Cartographie Interactive (Leaflet) */}
+          {/* Section Cartographie Interactive (Leaflet avec marqueurs dynamiques) */}
           <section className="mt-8">
             <div className="mb-3 flex items-center justify-between">
               <div>
@@ -238,16 +289,16 @@ export default function HomePage() {
                   Cartographie d&apos;Haïti
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Visualisation et navigation interactive des infrastructures publiques.
+                  Visualisation et navigation interactive des signalements sur le territoire.
                 </p>
               </div>
               <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
                 <span>🗺️</span>
-                <span>OpenStreetMap</span>
+                <span>{reports.length} marqueur{reports.length > 1 ? "s" : ""}</span>
               </span>
             </div>
 
-            <MapComponent />
+            <MapComponent reports={reports} />
           </section>
 
           {/* Section Bouton d'action et Messages de retour */}
@@ -397,7 +448,7 @@ export default function HomePage() {
                   📋
                 </span>
                 <p className="mt-2 font-semibold text-sm">
-                  Aucun signalement public disponible pour le moment
+                  Aucun signalement visible pour le moment
                 </p>
                 <p className="mx-auto mt-1 max-w-md text-xs text-slate-500 dark:text-slate-400">
                   En vertu des règles de sécurité (RLS), les nouveaux signalements
