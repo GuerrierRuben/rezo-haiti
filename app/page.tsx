@@ -133,32 +133,10 @@ export default function HomePage() {
     setIsLoading(false);
   }, []);
 
-  // Chargement initial des signalements avec protection contre les effets fantômes du Strict Mode
+  // Chargement initial des signalements côté client
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchInitialReports = async () => {
-      setIsLoading(true);
-      setFetchError(null);
-
-      const { data, error } = await getReports({ limit: 50 });
-      if (!isMounted) return;
-
-      if (error) {
-        setFetchError(error);
-      } else {
-        setReports(data ?? []);
-      }
-
-      setIsLoading(false);
-    };
-
-    fetchInitialReports();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    loadReports();
+  }, [loadReports]);
 
   /**
    * Envoie un signalement test via reportService et recharge la liste partagée.
