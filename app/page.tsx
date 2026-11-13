@@ -1,8 +1,43 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import dynamic from "next/dynamic";
 import { createReport, getReports } from "@/services/reportService";
 import type { CreateReportInput, Report, ReportCategory, ReportStatus } from "@/types";
+
+/**
+ * Chargement dynamique de la carte interactive Leaflet sans SSR (côté client uniquement).
+ */
+const MapComponent = dynamic(() => import("@/components/MapComponent"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-[60vh] min-h-[320px] w-full flex-col items-center justify-center rounded-xl border border-slate-200 bg-slate-100 shadow-xs dark:border-slate-800 dark:bg-slate-900">
+      <svg
+        className="h-7 w-7 animate-spin text-blue-600"
+        xmlns="http://www.w3.org/2000/svg"
+        fill="none"
+        viewBox="0 0 24 24"
+      >
+        <circle
+          className="opacity-25"
+          cx="12"
+          cy="12"
+          r="10"
+          stroke="currentColor"
+          strokeWidth="4"
+        />
+        <path
+          className="opacity-75"
+          fill="currentColor"
+          d="M4 12a8 8 0 018-8v8H4z"
+        />
+      </svg>
+      <p className="mt-3 text-xs font-medium text-slate-500 dark:text-slate-400">
+        Chargement de la carte...
+      </p>
+    </div>
+  ),
+});
 
 /**
  * Configuration visuelle des catégories de signalement.
@@ -141,7 +176,7 @@ export default function HomePage() {
             </span>
           </div>
           <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            🇭🇹 Haïti • Sprint 2
+            🇭🇹 Haïti • Sprint 3
           </span>
         </div>
       </header>
@@ -194,6 +229,26 @@ export default function HomePage() {
               <p className="text-[11px] text-slate-500">Centres & soins</p>
             </div>
           </div>
+
+          {/* Section Cartographie Interactive (Leaflet) */}
+          <section className="mt-8">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <h2 className="font-bold text-lg sm:text-xl">
+                  Cartographie d&apos;Haïti
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Visualisation et navigation interactive des infrastructures publiques.
+                </p>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-medium text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                <span>🗺️</span>
+                <span>OpenStreetMap</span>
+              </span>
+            </div>
+
+            <MapComponent />
+          </section>
 
           {/* Section Bouton d'action et Messages de retour */}
           <div className="mt-8 rounded-xl border border-slate-200 bg-white p-4 shadow-xs sm:p-6 dark:border-slate-800 dark:bg-slate-900">
