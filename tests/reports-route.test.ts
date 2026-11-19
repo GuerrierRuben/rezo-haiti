@@ -5,10 +5,6 @@ import { NextRequest } from "next/server";
 const mockInsert = vi.fn();
 const mockSelect = vi.fn();
 const mockSingle = vi.fn();
-const mockDelete = vi.fn();
-const mockLt = vi.fn();
-const mockEq = vi.fn();
-const mockGte = vi.fn();
 
 const mockFrom = vi.fn((table: string) => {
   if (table === "submission_log") {

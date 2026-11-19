@@ -2,12 +2,14 @@
 
 > Plateforme citoyenne et open-source de signalement, cartographie et modération collaborative des infrastructures et services publics en Haïti.
 
+[![CI](https://github.com/GuerrierRuben/rezo-haiti/actions/workflows/ci.yml/badge.svg)](https://github.com/GuerrierRuben/rezo-haiti/actions/workflows/ci.yml)
 [![Licence MIT](https://img.shields.io/badge/Licence-MIT-blue.svg)](LICENSE)
 [![Next.js](https://img.shields.io/badge/Next.js-16%20(App%20Router)-black.svg)](https://nextjs.org/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue.svg)](https://www.typescriptlang.org/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4.x-38bdf8.svg)](https://tailwindcss.com/)
 [![Leaflet](https://img.shields.io/badge/Leaflet-1.9.4-199900.svg)](https://leafletjs.com/)
 [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL%20%2B%20PostGIS-3ecf8e.svg)](https://supabase.com/)
+[![Vitest](https://img.shields.io/badge/Vitest-5.x-729B1B.svg)](https://vitest.dev/)
 
 ---
 
@@ -31,14 +33,16 @@ Conçue avec une approche **mobile-first**, l'interface s'adapte parfaitement au
 - Popups sécurisés contre les failles d'injection HTML/XSS (construction via les APIs DOM standards).
 - Navigation fluide sans réinitialisation de la vue lors des mises à jour des données.
 
-### 2. Signalement Citoyen Géolocalisé au Clic
+### 2. Signalement Citoyen Géolocalisé & Protection Anti-Spam
 - Sélection des coordonnées GPS en cliquant directement sur la carte (curseur en croix `crosshair`).
 - Marqueur temporaire distinctif avec animation de pulsation (`animate-ping`).
-- Validation stricte côté client avec Zod sur la boîte englobante d'Haïti :
+- Validation stricte côté client et côté serveur avec Zod sur la boîte englobante d'Haïti :
   - **Latitude** : de `17.9` à `20.2`
   - **Longitude** : de `-74.6` à `-71.6`
-- Protection contre les clics hors frontières avec retour visuel immédiat.
-- Formulaire complet accessible (titre, catégorie, description avec compteur de caractères, position).
+- **Protection anti-spam multicouche** :
+  - **Pot de miel (Honeypot)** : champ masqué invisible aux utilisateurs mais rempli par les robots spammeurs, retournant un faux succès immédiat sans écriture en base.
+  - **Limitation de débit (Rate Limiting)** : restriction à 5 soumissions par fenêtre glissante de 10 minutes par adresse IP (anonymisée par hachage SHA-256 salé), avec retour HTTP 429 et en-tête `Retry-After: 600`.
+  - **Contrôle d'accès SQL** : révocation des privilèges `INSERT` directs pour les rôles `anon` et `authenticated`, forçant le passage par l'API serveur sécurisée.
 
 ### 3. Liste Publique des Signalements (Lecture Seule)
 - Composant dédié [`ReportCard`](components/ReportCard.tsx) affichant les signalements publics validés.
@@ -66,7 +70,9 @@ Conçue avec une approche **mobile-first**, l'interface s'adapte parfaitement au
 | **Cartographie** | Leaflet 1.9.4 (intégration directe sans wrapper lourd, tuiles OpenStreetMap) |
 | **Base de Données & Auth** | Supabase (PostgreSQL 15+, extension géospatiale PostGIS) |
 | **Validation des données** | Zod 4 (schémas stricts pour signalements et profils) |
-| **Sécurité Base** | PostgreSQL Row Level Security (RLS) & Triggers PL/pgSQL |
+| **Tests Automatisés** | Vitest 5 (tests unitaires et routes d'API mockées) |
+| **Sécurité & Headers** | CSP, HSTS, X-Frame-Options, anti-spam honeypot + rate-limiting |
+| **CI / CD** | GitHub Actions & Dependabot |
 
 ---
 
@@ -74,37 +80,48 @@ Conçue avec une approche **mobile-first**, l'interface s'adapte parfaitement au
 
 ```text
 rezo-ayiti/
+├── .github/                      # Workflows CI et bots
+│   ├── dependabot.yml            # Veille hebdomadaire des dépendances npm
+│   └── workflows/ci.yml          # Pipeline GitHub Actions (lint, test, build)
 ├── app/                          # Routes Next.js App Router
-│   ├── api/                      # Endpoints REST (CRUD reports, nearby, users)
+│   ├── api/                      # Endpoints REST (CRUD reports, health, nearby, users)
 │   ├── moderation/               # Espace réservé de modération (/moderation)
-│   │   └── page.tsx              # Tableau de bord protégé
+│   ├── error.tsx                 # Page d'erreur 500 conviviale avec bouton réessai
+│   ├── not-found.tsx             # Page 404 conviviale avec redirection
 │   ├── globals.css               # Feuilles de style Tailwind CSS
-│   ├── layout.tsx                # Structure HTML globale et métadonnées
+│   ├── layout.tsx                # Métadonnées OpenGraph et structure HTML globale
 │   └── page.tsx                  # Page d'accueil publique (carte + formulaire + liste)
 ├── components/                   # Composants React réutilisables
 │   ├── MapComponent.tsx          # Carte Leaflet interactive (marqueurs, clics, sélection)
 │   ├── ModerationList.tsx        # Tableau de bord et filtres de modération
 │   └── ReportCard.tsx            # Carte de signalement publique (lecture seule, anti-XSS)
-├── docs/                         # Documentation technique et tests
+├── docs/                         # Documentation technique, tests et déploiement
 │   ├── API.md                    # Spécification détaillée des endpoints REST
+│   ├── DEPLOYMENT.md             # Guide pas à pas de mise en production Vercel & Supabase
 │   └── TESTING.md                # Checklist exhaustive des tests manuels
 ├── lib/                          # Clients et utilitaires
+│   ├── api-helpers.ts            # Réponses JSON formatées (jsonOk, jsonError)
+│   ├── rate-limit.ts             # Fonctions pures de hachage IP et limitation de débit
 │   ├── supabase.ts               # Client Supabase public (@supabase/supabase-js)
+│   ├── supabase-admin.ts         # Client Supabase serveur sécurisé (Service Role Key)
 │   ├── supabase-server.ts        # Client Supabase côté serveur avec token Bearer
 │   └── validations.ts            # Schémas de validation Zod et boîte englobante Haïti
 ├── services/                     # Couche de services centralisée
 │   ├── authService.ts            # Authentification (signIn, signOut, getCurrentProfile)
-│   └── reportService.ts          # Requêtes reports (get, create, updateReportStatus)
+│   └── reportService.ts          # Requêtes reports (get, create via API, updateReportStatus)
 ├── supabase/                     # Migrations PostgreSQL et politiques RLS
 │   └── migrations/
-│       ├── 001_init_reports.sql  # Extension PostGIS et table reports initiale
-│       └── 002_profiles_rls_geo.sql # Table profiles, rôles, RLS et fonction PostGIS
+│       ├── 001_init_reports.sql      # Extension PostGIS et table reports initiale
+│       ├── 002_profiles_rls_geo.sql  # Table profiles, rôles, RLS et fonction PostGIS
+│       └── 003_submission_guard.sql  # Table audit submission_log, index et révocation INSERT
+├── tests/                        # Suite de tests automatisés Vitest
+│   ├── rate-limit.test.ts        # Tests unitaires du hachage et des seuils de débit
+│   ├── reports-route.test.ts     # Tests d'intégration de la route POST /api/reports
+│   ├── services.test.ts          # Tests unitaires de la couche de services
+│   └── validations.test.ts       # Tests unitaires des schémas de validation Zod
 ├── types/                        # Définitions TypeScript centralisées
-│   ├── api.ts                    # Réponses standardisées d'API
-│   ├── index.ts                  # Point d'entrée des exports de types
-│   ├── profile.ts                # Profils et rôles (citoyen, moderateur, admin)
-│   └── report.ts                 # Signalements et paramètres d'entrée
-├── .env.example                  # Modèle des variables d'environnement
+├── .env.example                  # Modèle exhaustif des variables client et serveur
+├── vitest.config.mjs             # Configuration de la suite de tests Vitest
 ├── LICENSE                       # Licence open-source MIT
 └── package.json                  # Dépendances et scripts de build
 ```
@@ -135,13 +152,16 @@ Créez un fichier `.env.local` à la racine à partir du modèle fourni :
 cp .env.example .env.local
 ```
 
-Renseignez les deux variables obligatoires fournies dans les paramètres de votre projet Supabase (**Settings > API**) :
+Renseignez les variables requises (voir détails dans `.env.example`) :
 ```env
+# Variables publiques (navigateur)
 NEXT_PUBLIC_SUPABASE_URL=https://votre-projet.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=votre-cle-anon-publique
+
+# Variables secrètes (serveur uniquement)
+SUPABASE_SERVICE_ROLE_KEY=votre-cle-service-role-secrete
+RATE_LIMIT_SALT=votre_sel_aleatoire_secret_32_caracteres
 ```
-> [!IMPORTANT]
-> Ne renseignez **JAMAIS** la clé `service_role` dans les variables d'environnement du client. L'application s'appuie sur la clé publique `anon` et délègue les autorisations aux politiques de sécurité niveau ligne (RLS) de PostgreSQL.
 
 ---
 
@@ -152,103 +172,69 @@ Dans l'interface web de votre projet Supabase, ouvrez l'onglet **SQL Editor** et
 1. **[`supabase/migrations/001_init_reports.sql`](supabase/migrations/001_init_reports.sql)** :
    - Active l'extension `postgis`.
    - Crée la table de base `public.reports`.
-   - Définit les contraintes de catégories et de coordonnées géographiques.
 2. **[`supabase/migrations/002_profiles_rls_geo.sql`](supabase/migrations/002_profiles_rls_geo.sql)** :
    - Crée la table `public.profiles` liée à `auth.users(id)` avec les rôles (`citoyen`, `moderateur`, `admin`).
-   - Installe le trigger automatique de création de profil à l'inscription.
-   - Ajoute la colonne spatiale PostGIS calculée `location GEOGRAPHY(Point, 4326)` et l'index GIST.
-   - Définit les fonctions de sécurité `is_moderator()` et `is_admin()`.
+   - Installe le trigger de création automatique de profil.
+   - Ajoute la colonne spatiale `location` et la fonction RPC `nearby_reports`.
    - Active le **Row Level Security (RLS)** sur `reports` et `profiles`.
-   - Crée la fonction RPC de recherche de proximité `nearby_reports`.
+3. **[`supabase/migrations/003_submission_guard.sql`](supabase/migrations/003_submission_guard.sql)** :
+   - Crée la table `submission_log` pour la limitation de débit.
+   - Active le RLS sans politique publique (serveur admin uniquement).
+   - Révoque le droit `INSERT` direct sur `reports` pour `anon` et `authenticated`.
 
 ---
 
 ## 👤 Création et Promotion d'un Compte Modérateur
 
-Pour des raisons de sécurité, les comptes modérateurs ne peuvent pas s'inscrire librement. Suivez cette procédure en 2 étapes :
-
-### Étape 1 : Créer le compte utilisateur
-1. Rendez-vous dans le tableau de bord Supabase : **Authentication > Users**.
-2. Cliquez sur **« Add user »** > **« Create user »**.
-3. Renseignez l'adresse email (ex: `moderateur@rezoayiti.org`) et un mot de passe sécurisé.
-4. Validez : le compte est créé et le trigger SQL lui attribue automatiquement une entrée dans `public.profiles` avec le rôle par défaut `'citoyen'`.
-
-### Étape 2 : Promouvoir en modérateur
-Dans l'interface Supabase, deux méthodes sont possibles :
-- **Méthode visuelle (Table Editor) :**
-  - Ouvrez **Table Editor > profiles**.
-  - Localisez la ligne correspondant à l'utilisateur créé.
-  - Modifiez la colonne `role` de `citoyen` à `moderateur` (ou `admin`).
-- **Méthode SQL (SQL Editor) :**
-  ```sql
-  UPDATE public.profiles
-  SET role = 'moderateur'
-  WHERE id = (
-      SELECT id FROM auth.users WHERE email = 'moderateur@rezoayiti.org'
-  );
-  ```
-
-L'utilisateur peut maintenant se connecter sur [http://localhost:3000/moderation](http://localhost:3000/moderation).
+1. Créez l'utilisateur dans Supabase (**Authentication > Users** > **Add user**).
+2. Promouvez-le via SQL Editor :
+   ```sql
+   UPDATE public.profiles
+   SET role = 'moderateur'
+   WHERE id = (
+       SELECT id FROM auth.users WHERE email = 'moderateur@rezoayiti.org'
+   );
+   ```
+3. Connectez-vous sur [http://localhost:3000/moderation](http://localhost:3000/moderation).
 
 ---
 
-## 🔒 Modèle de Sécurité (PostgreSQL RLS)
+## 🧪 Tests Automatisés
 
-La sécurité de la plateforme ne dépend pas uniquement de l'interface utilisateur ; elle est garantie directement au niveau du moteur PostgreSQL :
+Le projet inclut une suite complète de 29 tests unitaires et d'intégration couvrant :
+- La validation des coordonnées GPS et des champs Zod (`tests/validations.test.ts`).
+- Le hachage cryptographique et les seuils de limitation de débit (`tests/rate-limit.test.ts`).
+- La route serveur `POST /api/reports` avec honeypot et rate limiting (`tests/reports-route.test.ts`).
+- Les services de récupération et de mise à jour de statut (`tests/services.test.ts`).
 
-```mermaid
-flowchart TD
-    A["Visiteur Anonyme"] -->|Lecture| B["Reports validés uniquement (status = 'valide')"]
-    A -->|Création| C["Nouveau signalement (status forcé à 'en_attente')"]
-    
-    D["Citoyen Connecté"] -->|Lecture| B
-    D -->|Lecture| E["Ses propres signalements"]
-    D -->|Accès /moderation| F["Accès Refusé (RLS bloque les signalements en attente)"]
-    
-    G["Modérateur / Admin"] -->|Lecture| H["Tous les signalements (en_attente, valide, resolu)"]
-    G -->|Mise à jour| I["Changement de statut (updateReportStatus)"]
-    G -->|Suppression| J["Suppression de signalements inappropriés"]
-```
-
-- **Table `reports`** :
-  - **SELECT** : Accessible publiquement si `status = 'valide'`, à l'auteur pour ses propres signalements, ou à tout modérateur (`is_moderator()`).
-  - **INSERT** : Autorisé à tous les utilisateurs (anonymes ou connectés), avec forçage obligatoire du statut à `'en_attente'`.
-  - **UPDATE / DELETE** : Strictement réservé aux comptes dont le profil possède le rôle `moderateur` ou `admin`.
-- **Table `profiles`** :
-  - **SELECT** : Chaque utilisateur ne peut consulter que son propre profil, sauf les administrateurs.
-  - **UPDATE** : Un utilisateur peut mettre à jour son nom d'affichage, mais une politique RLS lui interdit de modifier son propre rôle.
-
----
-
-## 🚦 Feuille de Route et Limites Connues
-
-### Réalisé
-- [x] Initialisation Next.js 16 + TypeScript + Tailwind CSS 4.
-- [x] Architecture modulaire de types (`types/`) et services centralisés (`services/`).
-- [x] API REST complète (`/api/reports`, `/api/reports/nearby`, `/api/users/me`).
-- [x] Intégration cartographique Leaflet sans SSR avec marqueurs par catégorie.
-- [x] Sélection interactive des coordonnées GPS par clic sur la carte.
-- [x] Validation Zod stricte sur les limites géographiques d'Haïti.
-- [x] Liste publique en lecture seule (`ReportCard`) avec protection anti-XSS.
-- [x] Espace de modération protégé (`/moderation`) avec filtres et compteurs par statut.
-
-### Limites Connues & Améliorations Futures
-- **Téléversement de photos** : L'ajout de photographies de terrain via Supabase Storage est prévu dans une version ultérieure.
-- **Support hors-ligne avancé** : Fonctionnement en mode dégradé avec synchronisation locale IndexedDB (PWA) lors des coupures de réseau prolongées.
-- **Clustering de marqueurs** : Intégration d'un algorithme de regroupement des marqueurs en cas de forte densité sur une même zone urbaine.
-
----
-
-## 🧪 Tests et Validation
-
-Pour exécuter la checklist complète des scénarios manuels (publication, refus citoyen, modération, tests de robustesse XSS) :
-👉 [**Consulter le protocole de test complet (docs/TESTING.md)**](docs/TESTING.md)
-
-Pour lancer la vérification de la compilation et du linter :
+Pour exécuter les tests :
 ```bash
-npm run lint
-npm run build
+# Lancement ponctuel (utilisé en CI)
+npm run test:run
+
+# Mode interactif avec surveillance des fichiers (watch)
+npm test
 ```
+
+---
+
+## 🚀 Déploiement en Production
+
+Le guide exhaustif de mise en production sur **Vercel** avec base de données **Supabase** est disponible dans la documentation dédiée :
+👉 [**Guide de Déploiement en Production (docs/DEPLOYMENT.md)**](docs/DEPLOYMENT.md)
+
+Ce guide détaille la configuration des variables d'environnement, les redirections Supabase Auth, la checklist post-déploiement et la procédure de rotation des clés secrètes en cas d'urgence.
+
+---
+
+## 🚦 Feuille de Route et Avancement
+
+- [x] **Sprint 1** : Initialisation Next.js 16 + TypeScript + Tailwind CSS 4 + Client Supabase.
+- [x] **Sprint 2** : Schémas SQL géospatiaux (PostGIS), profils, RLS et API REST paginée.
+- [x] **Sprint 3** : Types unifiés, couche de services réutilisable et carte interactive Leaflet.
+- [x] **Sprint 4** : Signalement citoyen interactif au clic sur la carte et validation de la bbox Haïti.
+- [x] **Sprint 5** : Espace de modération sécurisé avec filtrage par statut et contrôle de rôles.
+- [x] **Sprint 6** : Protection anti-spam serveur (honeypot + rate limit), headers de sécurité, suite de tests Vitest, CI GitHub Actions, Dependabot et guide de déploiement.
 
 ---
 
@@ -258,7 +244,7 @@ Les contributions de la communauté sont encouragées ! Pour participer :
 1. Forkez le projet.
 2. Créez une branche dédiée (`git checkout -b feature/amelioration-carte`).
 3. Appliquez des commits conventionnels et atomiques (`git commit -m 'feat: description claire'`).
-4. Vérifiez que `npm run lint` et `npm run build` passent sans erreur.
+4. Vérifiez que `npm run lint`, `npm run test:run` et `npm run build` passent sans erreur.
 5. Poussez votre branche et ouvrez une Pull Request.
 
 ---

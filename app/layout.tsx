@@ -13,9 +13,40 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rezo Ayiti | Cartographie & Infrastructures Publiques",
+  title: {
+    default: "Rezo Ayiti | Cartographie & Infrastructures Publiques",
+    template: "%s | Rezo Ayiti",
+  },
   description:
-    "Plateforme open-source de signalement et de cartographie collaborative des infrastructures et services publics en Haïti.",
+    "Plateforme open-source de signalement et de cartographie collaborative des infrastructures et services publics en Haïti (eau, électricité, routes, santé).",
+  keywords: [
+    "Haïti",
+    "Ayiti",
+    "signalement",
+    "infrastructures",
+    "cartographie",
+    "eau",
+    "électricité",
+    "santé",
+    "routes",
+    "citoyen",
+  ],
+  authors: [{ name: "Rezo Ayiti Community" }],
+  openGraph: {
+    title: "Rezo Ayiti | Cartographie & Infrastructures Publiques",
+    description:
+      "Plateforme open-source de signalement et de cartographie collaborative des infrastructures et services publics en Haïti.",
+    url: "https://rezo-ayiti.vercel.app",
+    siteName: "Rezo Ayiti",
+    locale: "fr_HT",
+    type: "website",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Rezo Ayiti | Cartographie & Infrastructures Publiques",
+    description:
+      "Plateforme open-source de signalement et de cartographie collaborative des infrastructures et services publics en Haïti.",
+  },
 };
 
 export default function RootLayout({
