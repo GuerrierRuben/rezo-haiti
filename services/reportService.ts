@@ -25,93 +25,58 @@ export interface GetReportsOptions {
 }
 
 /**
- * Générateur d'identifiant UUID universel compatible navigateur et Node.js.
- */
-function generateUUID(): string {
-  if (
-    typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
-  ) {
-    return crypto.randomUUID();
-  }
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
-    const r = (Math.random() * 16) | 0;
-    const v = c === "x" ? r : (r & 0x3) | 0x8;
-    return v.toString(16);
-  });
-}
-
-/**
- * Crée un nouveau signalement dans la table reports via Supabase.
- * Le statut initial est systématiquement forcé à 'en_attente'.
+ * Crée un nouveau signalement citoyen en appelant la route API sécurisée (/api/reports).
+ * Cette route applique les protections anti-spam (Honeypot, limitation de fréquence et validation).
  *
- * Tente d'abord de retourner l'enregistrement via .select().single().
- * Si la sécurité niveau ligne (RLS) bloque le RETURNING pour les utilisateurs anonymes,
- * procède à une insertion sans RETURNING avec identifiant pré-généré pour garantir la création.
- *
- * @param input Données nécessaires à la création du signalement
+ * @param input Données nécessaires à la création du signalement (avec champ honeypot optionnel)
  * @returns Le signalement créé ou un message d'erreur en français
  */
 export async function createReport(
-  input: CreateReportInput
+  input: CreateReportInput & { website?: string }
 ): Promise<ServiceResponse<Report>> {
   try {
-    const id = generateUUID();
-    const now = new Date().toISOString();
-
-    const reportData = {
-      id,
-      title: input.title.trim(),
-      description: input.description.trim(),
-      category: input.category,
-      latitude: input.latitude,
-      longitude: input.longitude,
-      status: "en_attente" as const,
-    };
-
-    // Tentative d'insertion avec sélection directe (.select().single())
-    const { data, error } = await supabase
-      .from("reports")
-      .insert(reportData)
-      .select(
-        "id, title, description, category, latitude, longitude, status, created_at, updated_at, user_id"
-      )
-      .single();
-
-    if (error) {
-      // Si la RLS Postgres (code 42501) empêche RETURNING pour un signalement 'en_attente' non authentifié,
-      // on réalise l'insertion directe sans RETURNING pour respecter la politique RLS INSERT.
-      if (error.code === "42501") {
-        const { error: insertError } = await supabase
-          .from("reports")
-          .insert(reportData);
-
-        if (insertError) {
-          return {
-            data: null,
-            error: "Impossible d'enregistrer le signalement. Veuillez vérifier votre connexion.",
-          };
-        }
-
-        return {
-          data: {
-            ...reportData,
-            created_at: now,
-            updated_at: now,
-            user_id: null,
-          },
-          error: null,
-        };
+    let authHeader: Record<string, string> = {};
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (session?.access_token) {
+        authHeader = { Authorization: `Bearer ${session.access_token}` };
       }
+    } catch {
+      // Ignorer si la session ne peut être extraite
+    }
 
+    const response = await fetch("/api/reports", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...authHeader,
+      },
+      body: JSON.stringify(input),
+    });
+
+    if (response.status === 429) {
       return {
         data: null,
-        error: "Impossible d'enregistrer le signalement.",
+        error: "Trop de signalements envoyés, réessayez dans quelques minutes.",
+      };
+    }
+
+    const result = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const message =
+        result?.error?.message ||
+        "Impossible d'enregistrer le signalement. Veuillez vérifier votre saisie.";
+      return {
+        data: null,
+        error: message,
       };
     }
 
     return {
-      data: data as Report,
+      data: (result?.data as Report) ?? null,
       error: null,
     };
   } catch {

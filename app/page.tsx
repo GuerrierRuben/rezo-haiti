@@ -55,6 +55,7 @@ export default function HomePage() {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(
     null
   );
+  const [website, setWebsite] = useState<string>("");
 
   // État de soumission et erreurs
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
@@ -203,6 +204,7 @@ export default function HomePage() {
       category,
       latitude: position!.lat,
       longitude: position!.lng,
+      website,
     });
 
     if (error) {
@@ -219,6 +221,7 @@ export default function HomePage() {
     setDescription("");
     setCategory("eau");
     setPosition(null);
+    setWebsite("");
 
     // Rechargement des signalements publics
     const { data: updatedReports, error: fetchErr } = await getReports({
@@ -329,6 +332,23 @@ export default function HomePage() {
                 )}
 
                 <form onSubmit={handleSubmit} noValidate className="space-y-4">
+                  {/* Champ Honeypot anti-spam (invisible pour les vrais utilisateurs, rempli par les robots) */}
+                  <div
+                    aria-hidden="true"
+                    className="absolute -left-[9999px] -top-[9999px] h-0 w-0 opacity-0 pointer-events-none -z-50 overflow-hidden"
+                  >
+                    <label htmlFor="report-website">Ne pas remplir ce champ</label>
+                    <input
+                      id="report-website"
+                      type="text"
+                      name="website"
+                      value={website}
+                      onChange={(e) => setWebsite(e.target.value)}
+                      tabIndex={-1}
+                      autoComplete="off"
+                    />
+                  </div>
+
                   {/* Champ Titre */}
                   <div>
                     <label
