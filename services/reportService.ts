@@ -208,3 +208,104 @@ export async function getReportById(
     };
   }
 }
+
+/**
+ * Met à jour le statut d'un signalement dans la table reports (réservé aux modérateurs).
+ * Utilise .update({ status }).eq('id', id).select().single() conformément aux règles RLS.
+ *
+ * @param id Identifiant UUID du signalement
+ * @param status Nouveau statut ('en_attente' | 'valide' | 'resolu')
+ * @returns Le signalement mis à jour ou un message d'erreur en français
+ */
+export async function updateReportStatus(
+  id: string,
+  status: ReportStatus
+): Promise<ServiceResponse<Report>> {
+  try {
+    const { data, error } = await supabase
+      .from("reports")
+      .update({ status })
+      .eq("id", id)
+      .select(
+        "id, title, description, category, latitude, longitude, status, created_at, updated_at, user_id"
+      )
+      .single();
+
+    if (error) {
+      // Si la RLS refuse (code 42501) ou si aucune ligne n'est retournée (PGRST116)
+      if (error.code === "PGRST116" || error.code === "42501") {
+        return {
+          data: null,
+          error: "Action non autorisée ou signalement introuvable.",
+        };
+      }
+
+      return {
+        data: null,
+        error: "Impossible de mettre à jour le statut du signalement.",
+      };
+    }
+
+    if (!data) {
+      return {
+        data: null,
+        error: "Action non autorisée ou signalement introuvable.",
+      };
+    }
+
+    return {
+      data: data as Report,
+      error: null,
+    };
+  } catch {
+    return {
+      data: null,
+      error: "Une erreur inattendue est survenue lors de la mise à jour du statut.",
+    };
+  }
+}
+
+/**
+ * Récupère tous les signalements sans filtre de statut (réservé à l'espace de modération).
+ * En vertu des politiques RLS Postgres, cette requête ne renverra tous les signalements
+ * que si l'utilisateur est authentifié avec le rôle 'moderateur' ou 'admin'.
+ *
+ * @returns Liste complète des signalements ou message d'erreur en français
+ */
+export async function getAllReportsForModeration(): Promise<
+  ServiceResponse<Report[]>
+> {
+  try {
+    const { data, error } = await supabase
+      .from("reports")
+      .select(
+        "id, title, description, category, latitude, longitude, status, created_at, updated_at, user_id"
+      )
+      .order("created_at", { ascending: false });
+
+    if (error) {
+      if (error.code === "42501") {
+        return {
+          data: null,
+          error: "Action non autorisée. Réservé aux modérateurs.",
+        };
+      }
+
+      return {
+        data: null,
+        error: "Impossible de charger les signalements pour la modération.",
+      };
+    }
+
+    return {
+      data: (data as Report[]) ?? [],
+      error: null,
+    };
+  } catch {
+    return {
+      data: null,
+      error: "Une erreur inattendue est survenue lors du chargement des signalements.",
+    };
+  }
+}
+
