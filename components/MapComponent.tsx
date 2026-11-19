@@ -16,7 +16,7 @@ export interface MapComponentProps {
   center?: [number, number];
 
   /**
-   * Niveau de zoom initial. Par défaut : 8.
+   * Niveau de zoom initial. Par défaut : 8 (vue globale d'Haïti entière).
    */
   zoom?: number;
 
@@ -29,6 +29,16 @@ export interface MapComponentProps {
    * Liste des signalements à afficher sous forme de marqueurs interactifs.
    */
   reports?: Report[];
+
+  /**
+   * Position géographique actuellement sélectionnée par l'utilisateur via clic.
+   */
+  selectedPosition?: { lat: number; lng: number } | null;
+
+  /**
+   * Callback déclenché lors d'un clic sur la carte pour sélectionner des coordonnées.
+   */
+  onSelectPosition?: (lat: number, lng: number) => void;
 }
 
 /**
@@ -96,6 +106,26 @@ function createCategoryDivIcon(category: ReportCategory): L.DivIcon {
     iconAnchor: [16, 32],
     popupAnchor: [0, -32],
     html: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9999px;background-color:#ffffff;box-shadow:0 2px 6px rgba(0,0,0,0.3);border:2px solid ${config.borderColor};font-size:16px;cursor:pointer;">${config.emoji}</div>`,
+  });
+}
+
+/**
+ * Crée l'icône du marqueur temporaire de sélection lors d'un clic sur la carte.
+ */
+function createSelectionDivIcon(): L.DivIcon {
+  return L.divIcon({
+    className: "selection-leaflet-marker",
+    iconSize: [36, 36],
+    iconAnchor: [18, 36],
+    popupAnchor: [0, -36],
+    html: `
+      <div style="position:relative;display:flex;align-items:center;justify-content:center;width:36px;height:36px;">
+        <span style="position:absolute;width:32px;height:32px;border-radius:9999px;background-color:#ef4444;opacity:0.4;animation:ping 1.5s cubic-bezier(0,0,0.2,1) infinite;"></span>
+        <div style="position:relative;display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:9999px;background-color:#dc2626;color:#ffffff;font-size:16px;box-shadow:0 3px 8px rgba(0,0,0,0.4);border:2px solid #ffffff;">
+          📍
+        </div>
+      </div>
+    `,
   });
 }
 
@@ -199,19 +229,28 @@ function fixLeafletDefaultIcons(): void {
 
 /**
  * Composant cartographique interactif basé sur Leaflet et OpenStreetMap.
- * Affiche dynamiquement les signalements sous forme de marqueurs géolocalisés avec popups.
+ * Affiche dynamiquement les signalements et permet de sélectionner des coordonnées au clic.
  */
 export default function MapComponent({
   center = [18.9712, -72.2852],
   zoom = 8,
   className = "h-[60vh] min-h-[320px] w-full rounded-xl border border-slate-200 shadow-xs overflow-hidden dark:border-slate-800",
   reports = [],
+  selectedPosition = null,
+  onSelectPosition,
 }: MapComponentProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const markersLayerRef = useRef<L.LayerGroup | null>(null);
+  const selectionMarkerRef = useRef<L.Marker | null>(null);
 
-  // 1. Initialisation unique de la carte (aucun reset lors d'un changement de reports)
+  // Référence mutable pour éviter des fermetures obsolètes dans l'écouteur d'événements Leaflet
+  const onSelectPositionRef = useRef(onSelectPosition);
+  useEffect(() => {
+    onSelectPositionRef.current = onSelectPosition;
+  }, [onSelectPosition]);
+
+  // 1. Initialisation unique de la carte (aucun reset lors d'un changement de reports ou selectedPosition)
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -246,6 +285,14 @@ export default function MapComponent({
     markersLayerRef.current = markersLayer;
     mapRef.current = map;
 
+    // Écouteur d'événement de clic pour la sélection de coordonnées
+    map.on("click", (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+      if (onSelectPositionRef.current) {
+        onSelectPositionRef.current(lat, lng);
+      }
+    });
+
     // Invalidation de la taille pour s'assurer que les tuiles se chargent dès l'affichage
     const timer = setTimeout(() => {
       map.invalidateSize();
@@ -254,6 +301,10 @@ export default function MapComponent({
     // Nettoyage au démontage
     return () => {
       clearTimeout(timer);
+      if (selectionMarkerRef.current) {
+        selectionMarkerRef.current.remove();
+        selectionMarkerRef.current = null;
+      }
       if (markersLayerRef.current) {
         markersLayerRef.current.clearLayers();
         markersLayerRef.current = null;
@@ -263,9 +314,10 @@ export default function MapComponent({
         mapRef.current = null;
       }
     };
-  }, [center, zoom]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  // 2. Gestion dynamique des marqueurs (se déclenche uniquement lors de modifications de reports)
+  // 2. Gestion dynamique des marqueurs de signalements (ne modifie jamais le zoom ni le centre de la carte)
   useEffect(() => {
     const markersLayer = markersLayerRef.current;
     if (!markersLayer) return;
@@ -306,7 +358,45 @@ export default function MapComponent({
     });
   }, [reports]);
 
-  return <div ref={containerRef} className={className} />;
+  // 3. Gestion du marqueur temporaire de sélection (créé/déplacé quand selectedPosition change, supprimé si null)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (!selectedPosition) {
+      if (selectionMarkerRef.current) {
+        selectionMarkerRef.current.remove();
+        selectionMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const { lat, lng } = selectedPosition;
+    const selectionIcon = createSelectionDivIcon();
+
+    if (selectionMarkerRef.current) {
+      selectionMarkerRef.current.setLatLng([lat, lng]);
+      selectionMarkerRef.current.setIcon(selectionIcon);
+    } else {
+      const marker = L.marker([lat, lng], {
+        icon: selectionIcon,
+        zIndexOffset: 1000,
+      });
+      marker.bindTooltip("Emplacement sélectionné", {
+        permanent: false,
+        direction: "top",
+      });
+      marker.addTo(map);
+      selectionMarkerRef.current = marker;
+    }
+  }, [selectedPosition]);
+
+  return (
+    <div
+      ref={containerRef}
+      className={`${className} cursor-crosshair [&_.leaflet-grab]:cursor-crosshair [&_.leaflet-container]:cursor-crosshair`}
+    />
+  );
 }
 
 export { MapComponent };
