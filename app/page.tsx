@@ -2,9 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { createReport, getReports } from "@/services/reportService";
 import { HAITI_BBOX, createReportSchema } from "@/lib/validations";
-import type { Report, ReportCategory, ReportStatus } from "@/types";
+import ReportCard from "@/components/ReportCard";
+import type { Report, ReportCategory } from "@/types";
 
 /**
  * Chargement dynamique de la carte interactive Leaflet sans SSR (côté client uniquement).
@@ -39,59 +41,6 @@ const MapComponent = dynamic(() => import("@/components/MapComponent"), {
     </div>
   ),
 });
-
-/**
- * Configuration visuelle des catégories de signalement.
- */
-const CATEGORY_CONFIG: Record<
-  ReportCategory,
-  { label: string; icon: string; badgeClass: string }
-> = {
-  eau: {
-    label: "Eau",
-    icon: "💧",
-    badgeClass: "bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
-  },
-  electricite: {
-    label: "Électricité",
-    icon: "⚡",
-    badgeClass: "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300",
-  },
-  route: {
-    label: "Route / Infrastructure",
-    icon: "🛣️",
-    badgeClass: "bg-stone-100 text-stone-700 dark:bg-stone-800 dark:text-stone-300",
-  },
-  sante: {
-    label: "Santé / Urgence",
-    icon: "🏥",
-    badgeClass: "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300",
-  },
-};
-
-/**
- * Configuration visuelle des statuts de modération.
- */
-const STATUS_CONFIG: Record<
-  ReportStatus,
-  { label: string; badgeClass: string }
-> = {
-  en_attente: {
-    label: "En attente",
-    badgeClass:
-      "bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/40 dark:text-amber-400 dark:border-amber-800",
-  },
-  valide: {
-    label: "Validé",
-    badgeClass:
-      "bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800",
-  },
-  resolu: {
-    label: "Résolu",
-    badgeClass:
-      "bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800",
-  },
-};
 
 export default function HomePage() {
   // Liste des signalements publics affichés
@@ -311,9 +260,19 @@ export default function HomePage() {
               Rezo Ayiti
             </span>
           </div>
-          <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-            🇭🇹 Haïti • Plateforme Citoyenne
-          </span>
+
+          <div className="flex items-center gap-3">
+            <Link
+              href="/moderation"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 hover:text-blue-600 dark:text-slate-400 dark:hover:text-blue-400 transition"
+            >
+              <span>🛡️</span>
+              <span>Espace modération</span>
+            </Link>
+            <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+              🇭🇹 Haïti • Plateforme Citoyenne
+            </span>
+          </div>
         </div>
       </header>
 
@@ -574,12 +533,12 @@ export default function HomePage() {
             </div>
           </div>
 
-          {/* Section Liste des Derniers Signalements Publics */}
+          {/* Section Liste des Signalements Récents (en lecture seule) */}
           <section className="mt-10 lg:mt-12">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b border-slate-200 pb-3 dark:border-slate-800">
               <div>
                 <h2 className="font-bold text-lg sm:text-xl text-slate-900 dark:text-white">
-                  Signalements récents
+                  Signalements récents ({reports.length})
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   Signalements validés et visibles publiquement sur la plateforme.
@@ -596,9 +555,6 @@ export default function HomePage() {
                 >
                   🔄 Rafraîchir
                 </button>
-                <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-slate-800 dark:text-slate-300">
-                  {reports.length} affiché{reports.length > 1 ? "s" : ""}
-                </span>
               </div>
             </div>
 
@@ -662,65 +618,12 @@ export default function HomePage() {
               </div>
             )}
 
-            {/* État : Liste des signalements */}
+            {/* État : Liste des signalements via ReportCard */}
             {!isLoading && !fetchError && reports.length > 0 && (
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {reports.map((report) => {
-                  const categoryInfo = CATEGORY_CONFIG[report.category] ?? {
-                    label: report.category,
-                    icon: "📌",
-                    badgeClass: "bg-slate-100 text-slate-700",
-                  };
-                  const statusInfo = STATUS_CONFIG[report.status] ?? {
-                    label: report.status,
-                    badgeClass: "bg-slate-100 text-slate-700 border-slate-200",
-                  };
-
-                  return (
-                    <article
-                      key={report.id}
-                      className="flex flex-col justify-between rounded-xl border border-slate-200 bg-white p-4 shadow-xs transition hover:border-slate-300 dark:border-slate-800 dark:bg-slate-900 dark:hover:border-slate-700"
-                    >
-                      <div>
-                        <div className="flex flex-wrap items-center justify-between gap-1.5">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${categoryInfo.badgeClass}`}
-                          >
-                            <span>{categoryInfo.icon}</span>
-                            <span>{categoryInfo.label}</span>
-                          </span>
-
-                          <span
-                            className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-semibold ${statusInfo.badgeClass}`}
-                          >
-                            {statusInfo.label}
-                          </span>
-                        </div>
-
-                        <h3 className="mt-2 font-bold text-sm text-slate-900 dark:text-white">
-                          {report.title}
-                        </h3>
-
-                        <p className="mt-1 line-clamp-3 text-xs text-slate-600 dark:text-slate-300">
-                          {report.description}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-1 border-t border-slate-100 pt-2 text-[11px] text-slate-400 dark:border-slate-800">
-                        <span>
-                          📍 {report.latitude.toFixed(4)}, {report.longitude.toFixed(4)}
-                        </span>
-                        <span>
-                          {new Date(report.created_at).toLocaleDateString("fr-FR", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </span>
-                      </div>
-                    </article>
-                  );
-                })}
+                {reports.map((report) => (
+                  <ReportCard key={report.id} report={report} />
+                ))}
               </div>
             )}
           </section>
